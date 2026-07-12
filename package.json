@@ -1,0 +1,42 @@
+{
+  "name": "zabal-radar",
+  "version": "0.1.2",
+  "description": "تنبيه محلي للاعبين الموجودين في قائمتك أثناء مباريات League of Legends",
+  "main": "src/main.cjs",
+  "author": "Othman Alomair",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win --x64",
+    "dist": "electron-builder --mac && electron-builder --win --x64"
+  },
+  "devDependencies": {
+    "electron": "^37.2.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.most3mr.zabalradar",
+    "productName": "رادار الزبايل",
+    "asar": true,
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.utilities",
+      "icon": "assets/icon.icns",
+      "target": ["dmg", "zip"]
+    },
+    "win": {
+      "icon": "assets/icon.png",
+      "target": ["nsis", "portable"]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

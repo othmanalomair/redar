@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:;" />
+  <title>رادار الزبايل</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"><i></i></div>
+        <div><h1>رادار الزبايل</h1><p>ذاكرة ما تنسى منو خرب عليك القيم</p></div>
+      </div>
+      <div class="status-pill" id="statusPill"><span></span><b>بانتظار League</b></div>
+    </header>
+
+    <section class="radar-panel" id="radarPanel">
+      <div class="radar-copy">
+        <span class="eyebrow">المراقبة الحيّة</span>
+        <h2 id="radarTitle">الرادار شغّال بالخلفية</h2>
+        <p id="radarText">افتح League والبرنامج يتكفّل بالباقي. إذا دخل واحد من القائمة، بنقول لك فورًا.</p>
+        <div class="radar-actions">
+          <button class="primary" id="addButton">+ أضف لاعب</button>
+          <button class="quiet" id="monitorButton">إيقاف المراقبة</button>
+        </div>
+      </div>
+      <div class="radar-visual" aria-hidden="true">
+        <div class="sweep"></div><div class="ring ring-one"></div><div class="ring ring-two"></div><div class="cross x"></div><div class="cross y"></div><i class="blip one"></i><i class="blip two"></i>
+      </div>
+    </section>
+
+    <section class="content-grid">
+      <div class="list-card">
+        <div class="section-title"><div><span class="eyebrow">القائمة السوداء</span><h2>المحفوظين عندك</h2></div><strong id="playerCount">0</strong></div>
+        <div id="playerList" class="player-list"></div>
+        <div id="emptyState" class="empty-state">
+          <div class="empty-icon">#</div><h3>القائمة نظيفة… للحين</h3><p>أضف Riot ID أول شخص ينرفزك، وخله على رادارنا.</p><button class="text-button" id="emptyAdd">أضف أول لاعب</button>
+        </div>
+      </div>
+      <aside class="settings-card">
+        <span class="eyebrow">الإعدادات</span><h2>خلّه على مزاجك</h2>
+        <label class="switch-row"><span><b>صوت التنبيه</b><small>نغمة مع الإشعار</small></span><input type="checkbox" id="soundToggle"><i></i></label>
+        <label class="switch-row"><span><b>تشغيل مع الجهاز</b><small>يبدأ مخفيًا بالخلفية</small></span><input type="checkbox" id="launchToggle"><i></i></label>
+        <div class="tray-note"><span>⌃</span><p><b>إذا سكّرت النافذة</b><br>البرنامج ما يطفي. تلقاه بأيقونة صغيرة فوق بالماك أو يم الساعة بالوندوز.</p></div>
+        <button class="docs-link" id="docsButton">شلون يقرأ المباراة؟ ↗</button>
+      </aside>
+    </section>
+  </main>
+
+  <dialog id="playerDialog">
+    <form method="dialog" id="playerForm">
+      <div class="dialog-head"><div><span class="eyebrow" id="dialogEyebrow">هدف جديد</span><h2 id="dialogTitle">أضف لاعب للرادار</h2></div><button type="button" class="close-button dialog-cancel" aria-label="إغلاق">×</button></div>
+      <input type="hidden" id="playerId">
+      <label class="field"><span>Riot ID</span><input id="riotId" dir="ltr" placeholder="PlayerName#TAG" autocomplete="off" required><small>لا تنسى الاسم والـ Tag كاملين</small></label>
+      <label class="field"><span>شنو سوى؟ <em>اختياري</em></span><textarea id="note" placeholder="مثال: سبني وقال jungle diff"></textarea></label>
+      <fieldset><legend>درجة الزبالة</legend><div class="levels"><label><input type="radio" name="level" value="عادي" checked><span>عادي</span></label><label><input type="radio" name="level" value="محترف"><span>محترف</span></label><label><input type="radio" name="level" value="تاريخي"><span>عدو تاريخي</span></label></div></fieldset>
+      <p class="form-error" id="formError"></p>
+      <div class="dialog-actions"><button type="button" class="quiet dialog-cancel">إلغاء</button><button type="submit" class="primary" id="saveButton">حفظ بالقائمة</button></div>
+    </form>
+  </dialog>
+  <script src="renderer.js"></script>
+</body>
+</html>
