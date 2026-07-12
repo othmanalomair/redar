@@ -1,6 +1,6 @@
 {
   "name": "zabal-radar",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "تنبيه محلي للاعبين الموجودين في قائمتك أثناء مباريات League of Legends",
   "main": "src/main.cjs",
   "author": "Othman Alomair",

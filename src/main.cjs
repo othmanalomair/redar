@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Menu, Tray, Notification, nativeImage, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage, shell } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const https = require('node:https');
@@ -51,6 +51,11 @@ function normalizeRiotId(value) {
 }
 
 function trayIcon(color = '#7B8494') {
+  if (process.platform === 'win32') {
+    return nativeImage
+      .createFromPath(path.join(__dirname, '..', 'assets', 'icon.png'))
+      .resize({ width: 16, height: 16, quality: 'best' });
+  }
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="8" fill="none" stroke="${color}" stroke-width="2"/><circle cx="11" cy="11" r="3" fill="${color}"/><path d="M11 1v3M11 18v3M1 11h3M18 11h3" stroke="${color}" stroke-width="2" stroke-linecap="round"/></svg>`;
   const image = nativeImage.createFromDataURL(`data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`);
   image.setTemplateImage(process.platform === 'darwin');
@@ -145,11 +150,11 @@ function createOverlayWindow() {
   overlayWindow.loadFile(path.join(__dirname, 'overlay.html'));
 }
 
-function showOverlay(match) {
+function showOverlay(matches, sound = false) {
   if (!overlayWindow || overlayWindow.isDestroyed()) return;
   const display = require('electron').screen.getPrimaryDisplay();
   const width = 620;
-  const height = 190;
+  const height = Math.min(465, 145 + Math.min(matches.length, 5) * 62);
   overlayWindow.setBounds({
     x: Math.round(display.bounds.x + (display.bounds.width - width) / 2),
     y: Math.round(display.bounds.y + 44),
@@ -157,28 +162,17 @@ function showOverlay(match) {
     height
   });
   const reveal = () => {
-    overlayWindow.webContents.send('show-alert', match);
+    overlayWindow.webContents.send('show-alert', { matches });
     overlayWindow.showInactive();
+    if (sound) shell.beep();
     clearTimeout(overlayTimer);
-    overlayTimer = setTimeout(() => overlayWindow?.hide(), 8_200);
+    overlayTimer = setTimeout(() => overlayWindow?.hide(), 10_200);
   };
   if (overlayWindow.webContents.isLoadingMainFrame()) {
     overlayWindow.webContents.once('did-finish-load', reveal);
   } else {
     reveal();
   }
-}
-
-function sendAlert(match, settings) {
-  if (settings.overlay) showOverlay(match);
-  if (!Notification.isSupported()) return;
-  const notification = new Notification({
-    title: `🚨 هذا اللاعب ${match.side}`,
-    body: `${match.riotId}${match.note ? ` — ${match.note}` : ''}`,
-    silent: !settings.sound,
-    icon: path.join(__dirname, '..', 'assets', 'icon.png')
-  });
-  notification.show();
 }
 
 function fetchLivePlayers() {
@@ -219,6 +213,7 @@ async function pollLeague() {
     leagueOnline = true;
     const active = livePlayers.find(player => player.isActivePlayer) || livePlayers[0];
     const matches = [];
+    const newMatches = [];
     for (const listed of data.players) {
       const found = livePlayers.find(live => normalizeRiotId(live.riotId || live.summonerName || '') === normalizeRiotId(listed.riotId));
       if (!found) continue;
@@ -226,9 +221,12 @@ async function pollLeague() {
       matches.push({ ...listed, side, champion: found.championName || '' });
       if (!alertedInGame.has(listed.id)) {
         alertedInGame.add(listed.id);
-        sendAlert({ ...listed, side, champion: found.championName || '' }, data.settings);
-        updateTray('alert');
+        newMatches.push({ ...listed, side, champion: found.championName || '' });
       }
+    }
+    if (newMatches.length) {
+      if (data.settings.overlay) showOverlay(newMatches, data.settings.sound);
+      updateTray('alert');
     }
     window?.webContents.send('league-status', { online: true, paused: false, count: livePlayers.length, matches });
     if (!matches.length) updateTray('watching');
@@ -251,10 +249,11 @@ app.whenReady().then(() => {
   pollLeague();
   pollTimer = setInterval(pollLeague, POLL_INTERVAL_MS);
   if (process.argv.includes('--preview-overlay')) {
-    setTimeout(() => showOverlay({
-      riotId: 'TrashKing#404', side: 'ضدك', champion: 'Teemo',
-      note: 'هذا مثال لشكل التنبيه داخل القيم'
-    }), 900);
+    setTimeout(() => showOverlay([
+      { riotId: 'TrashKing#404', side: 'ضدك', champion: 'Teemo', note: 'سبك وقال jungle diff' },
+      { riotId: 'NoHands#MID', side: 'معك', champion: 'Yasuo', note: 'خرب عليك البرومو' },
+      { riotId: 'TiltMaster#GG', side: 'ضدك', champion: 'Shaco', note: 'عدو تاريخي' }
+    ]), 900);
   }
 });
 
@@ -299,10 +298,8 @@ ipcMain.handle('save-settings', (_event, settings) => {
 });
 ipcMain.handle('open-riot-docs', () => shell.openExternal('https://developer.riotgames.com/docs/lol'));
 ipcMain.handle('test-alert', () => {
-  showOverlay({
-    riotId: 'TrashKing#404',
-    side: 'ضدك',
-    champion: 'Teemo',
-    note: 'هذا مثال لشكل التنبيه داخل القيم'
-  });
+  showOverlay([
+    { riotId: 'TrashKing#404', side: 'ضدك', champion: 'Teemo', note: 'هذا مثال لشكل التنبيه داخل القيم' },
+    { riotId: 'NoHands#MID', side: 'معك', champion: 'Yasuo', note: 'مثال إذا فيه أكثر من هدف' }
+  ]);
 });
