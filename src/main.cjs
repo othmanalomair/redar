@@ -4,16 +4,25 @@ const path = require('node:path');
 const https = require('node:https');
 
 let window;
+let overlayWindow;
 let tray;
 let pollTimer;
 let isQuitting = false;
-let lastGameKey = null;
 let alertedInGame = new Set();
 let leagueOnline = false;
+let gameActive = false;
+let lastLiveAt = 0;
+let overlayTimer;
+
+const GAME_GAP_MS = 60_000;
+const POLL_INTERVAL_MS = 3_000;
+const WINDOWS_APP_ID = 'com.most3mr.zabalradar';
+
+if (process.platform === 'win32') app.setAppUserModelId(WINDOWS_APP_ID);
 
 const defaultData = {
   players: [],
-  settings: { monitoring: true, sound: true, launchAtLogin: false }
+  settings: { monitoring: true, sound: true, overlay: true, launchAtLogin: false }
 };
 
 function dataPath() {
@@ -111,6 +120,67 @@ function createWindow() {
   });
 }
 
+function createOverlayWindow() {
+  overlayWindow = new BrowserWindow({
+    width: 620,
+    height: 190,
+    show: false,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    movable: false,
+    focusable: false,
+    skipTaskbar: true,
+    hasShadow: false,
+    alwaysOnTop: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'overlay-preload.cjs'),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+  overlayWindow.setAlwaysOnTop(true, 'screen-saver');
+  overlayWindow.setIgnoreMouseEvents(true, { forward: true });
+  overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  overlayWindow.loadFile(path.join(__dirname, 'overlay.html'));
+}
+
+function showOverlay(match) {
+  if (!overlayWindow || overlayWindow.isDestroyed()) return;
+  const display = require('electron').screen.getPrimaryDisplay();
+  const width = 620;
+  const height = 190;
+  overlayWindow.setBounds({
+    x: Math.round(display.bounds.x + (display.bounds.width - width) / 2),
+    y: Math.round(display.bounds.y + 44),
+    width,
+    height
+  });
+  const reveal = () => {
+    overlayWindow.webContents.send('show-alert', match);
+    overlayWindow.showInactive();
+    clearTimeout(overlayTimer);
+    overlayTimer = setTimeout(() => overlayWindow?.hide(), 8_200);
+  };
+  if (overlayWindow.webContents.isLoadingMainFrame()) {
+    overlayWindow.webContents.once('did-finish-load', reveal);
+  } else {
+    reveal();
+  }
+}
+
+function sendAlert(match, settings) {
+  if (settings.overlay) showOverlay(match);
+  if (!Notification.isSupported()) return;
+  const notification = new Notification({
+    title: `🚨 هذا اللاعب ${match.side}`,
+    body: `${match.riotId}${match.note ? ` — ${match.note}` : ''}`,
+    silent: !settings.sound,
+    icon: path.join(__dirname, '..', 'assets', 'icon.png')
+  });
+  notification.show();
+}
+
 function fetchLivePlayers() {
   return new Promise((resolve, reject) => {
     const request = https.get({
@@ -141,13 +211,13 @@ async function pollLeague() {
   }
   try {
     const livePlayers = await fetchLivePlayers();
+    const now = Date.now();
+    const startsNewGame = !gameActive || (lastLiveAt > 0 && now - lastLiveAt > GAME_GAP_MS);
+    if (startsNewGame) alertedInGame = new Set();
+    gameActive = true;
+    lastLiveAt = now;
     leagueOnline = true;
     const active = livePlayers.find(player => player.isActivePlayer) || livePlayers[0];
-    const gameKey = livePlayers.map(p => p.riotId || p.summonerName).sort().join('|');
-    if (gameKey !== lastGameKey) {
-      lastGameKey = gameKey;
-      alertedInGame = new Set();
-    }
     const matches = [];
     for (const listed of data.players) {
       const found = livePlayers.find(live => normalizeRiotId(live.riotId || live.summonerName || '') === normalizeRiotId(listed.riotId));
@@ -156,20 +226,15 @@ async function pollLeague() {
       matches.push({ ...listed, side, champion: found.championName || '' });
       if (!alertedInGame.has(listed.id)) {
         alertedInGame.add(listed.id);
-        new Notification({
-          title: `🚨 هذا اللاعب ${side}`,
-          body: `${listed.riotId}${listed.note ? ` — ${listed.note}` : ''}`,
-          silent: !data.settings.sound
-        }).show();
+        sendAlert({ ...listed, side, champion: found.championName || '' }, data.settings);
         updateTray('alert');
       }
     }
     window?.webContents.send('league-status', { online: true, paused: false, count: livePlayers.length, matches });
     if (!matches.length) updateTray('watching');
   } catch {
-    if (leagueOnline || lastGameKey) {
-      lastGameKey = null;
-      alertedInGame = new Set();
+    if (lastLiveAt > 0 && Date.now() - lastLiveAt > GAME_GAP_MS) {
+      gameActive = false;
     }
     leagueOnline = false;
     window?.webContents.send('league-status', { online: false, paused: false });
@@ -179,11 +244,18 @@ async function pollLeague() {
 
 app.whenReady().then(() => {
   createWindow();
+  createOverlayWindow();
   tray = new Tray(trayIcon());
   tray.on('click', showWindow);
   updateTray();
   pollLeague();
-  pollTimer = setInterval(pollLeague, 5000);
+  pollTimer = setInterval(pollLeague, POLL_INTERVAL_MS);
+  if (process.argv.includes('--preview-overlay')) {
+    setTimeout(() => showOverlay({
+      riotId: 'TrashKing#404', side: 'ضدك', champion: 'Teemo',
+      note: 'هذا مثال لشكل التنبيه داخل القيم'
+    }), 900);
+  }
 });
 
 app.on('before-quit', () => { isQuitting = true; clearInterval(pollTimer); });
@@ -226,3 +298,11 @@ ipcMain.handle('save-settings', (_event, settings) => {
   return data;
 });
 ipcMain.handle('open-riot-docs', () => shell.openExternal('https://developer.riotgames.com/docs/lol'));
+ipcMain.handle('test-alert', () => {
+  showOverlay({
+    riotId: 'TrashKing#404',
+    side: 'ضدك',
+    champion: 'Teemo',
+    note: 'هذا مثال لشكل التنبيه داخل القيم'
+  });
+});

@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('radar', {
   savePlayer: player => ipcRenderer.invoke('save-player', player),
   deletePlayer: id => ipcRenderer.invoke('delete-player', id),
   saveSettings: settings => ipcRenderer.invoke('save-settings', settings),
+  testAlert: () => ipcRenderer.invoke('test-alert'),
   openRiotDocs: () => ipcRenderer.invoke('open-riot-docs'),
   onLeagueStatus: callback => ipcRenderer.on('league-status', (_event, status) => callback(status)),
   onDataChanged: callback => ipcRenderer.on('data-changed', (_event, data) => callback(data)),

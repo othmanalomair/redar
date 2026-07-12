@@ -16,6 +16,7 @@ function render() {
       <div class="row-actions"><button class="icon-button edit" data-id="${player.id}" title="تعديل">✎</button><button class="icon-button delete" data-id="${player.id}" title="حذف">×</button></div>
     </article>`).join('');
   $('#soundToggle').checked = Boolean(data.settings.sound);
+  $('#overlayToggle').checked = data.settings.overlay !== false;
   $('#launchToggle').checked = Boolean(data.settings.launchAtLogin);
   $('#monitorButton').textContent = data.settings.monitoring ? 'إيقاف المراقبة' : 'تشغيل المراقبة';
 }
@@ -61,8 +62,10 @@ $('#playerList').addEventListener('click', async event => {
 });
 $('#monitorButton').addEventListener('click', async () => { data = await window.radar.saveSettings({ monitoring: !data.settings.monitoring }); render(); });
 $('#soundToggle').addEventListener('change', async event => { data = await window.radar.saveSettings({ sound: event.target.checked }); render(); });
+$('#overlayToggle').addEventListener('change', async event => { data = await window.radar.saveSettings({ overlay: event.target.checked }); render(); });
 $('#launchToggle').addEventListener('change', async event => { data = await window.radar.saveSettings({ launchAtLogin: event.target.checked }); render(); });
 $('#docsButton').addEventListener('click', () => window.radar.openRiotDocs());
+$('#testAlertButton').addEventListener('click', () => window.radar.testAlert());
 
 window.radar.onLeagueStatus(status => {
   const pill = $('#statusPill');
